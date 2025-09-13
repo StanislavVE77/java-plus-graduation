@@ -13,6 +13,7 @@ spring:
           searchLocations:
             - classpath:config/{application}
             - classpath:config/infra/{application}
+            - classpath:config/core/{application}
 
 eureka:
   client:

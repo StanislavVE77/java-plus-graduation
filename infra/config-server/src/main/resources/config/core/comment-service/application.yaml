@@ -1,0 +1,22 @@
+spring:
+  datasource:
+    initialization-mode: always
+    driverClassName: org.postgresql.Driver
+    url: jdbc:postgresql://localhost:5436/comment
+    username: comment
+    password: comment
+  jpa:
+    show-sql: true
+    defer-datasource-initialization: true
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  sql:
+    init:
+      mode: always
+
+server:
+  port: 0

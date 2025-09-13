@@ -6,6 +6,9 @@ import org.springframework.cloud.client.discovery.DiscoveryClient;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.http.HttpStatus;
+import org.springframework.retry.backoff.FixedBackOffPolicy;
+import org.springframework.retry.policy.MaxAttemptsRetryPolicy;
+import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -32,7 +35,6 @@ public class RestStatClient{
 
     public void saveHit(HitDto hitDto) {
         restClient.post()
-                //.uri("/hit")
                 .uri(makeUri("/hit"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(hitDto)
@@ -64,7 +66,17 @@ public class RestStatClient{
     }
 
     private URI makeUri(String path) {
-        ServiceInstance instance = getInstance();
+        RetryTemplate retryTemplate = new RetryTemplate();
+
+        FixedBackOffPolicy fixedBackOffPolicy = new FixedBackOffPolicy();
+        fixedBackOffPolicy.setBackOffPeriod(3000L);
+        retryTemplate.setBackOffPolicy(fixedBackOffPolicy);
+
+        MaxAttemptsRetryPolicy retryPolicy = new MaxAttemptsRetryPolicy();
+        retryPolicy.setMaxAttempts(3);
+        retryTemplate.setRetryPolicy(retryPolicy);
+
+        ServiceInstance instance = retryTemplate.execute(cxt -> getInstance());
         return URI.create("http://" + instance.getHost() + ":" + instance.getPort() + path);
     }
 
