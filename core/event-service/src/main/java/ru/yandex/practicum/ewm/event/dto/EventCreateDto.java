@@ -46,5 +46,5 @@ public class EventCreateDto {
     @Size(max = 120, min = 3, message = "Title length must be between 3 and 120 characters")
     private String title;
 
-    private Integer views = 0;
+    private Double rating = 0D;
 }

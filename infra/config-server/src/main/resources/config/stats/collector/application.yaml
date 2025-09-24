@@ -1,0 +1,16 @@
+collector:
+  kafka:
+    bootstrap-servers: "localhost:9092"
+    producer:
+      properties:
+        "bootstrap.servers": ${collector.kafka.bootstrap-servers}
+        "key.serializer": "org.apache.kafka.common.serialization.StringSerializer"
+        "value.serializer": "ru.practicum.stats.collector.configuration.UserActionAvroSerializer"
+      topic: "stats.user-actions.v1"
+
+grpc:
+  server:
+    port: 0
+
+server:
+  port: 0

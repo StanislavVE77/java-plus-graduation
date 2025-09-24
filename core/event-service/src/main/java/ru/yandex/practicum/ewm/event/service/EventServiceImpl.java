@@ -1,6 +1,7 @@
 package ru.yandex.practicum.ewm.event.service;
 
 import com.querydsl.core.types.dsl.BooleanExpression;
+import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -8,9 +9,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
-import ru.practicum.client.RestStatClient;
-import ru.practicum.dto.HitDto;
-import ru.practicum.dto.StatsDto;
+import ru.practicum.client.CollectorClient;
+import ru.practicum.client.RecommendationClient;
+import ru.practicum.grpc.stats.recommendations.RecommendedEventProto;
+import ru.practicum.grpc.stats.useraction.UserActionProto;
 import ru.yandex.practicum.ewm.category.model.Category;
 import ru.yandex.practicum.ewm.category.model.QCategory;
 import ru.yandex.practicum.ewm.category.storage.CategoryRepository;
@@ -27,6 +29,7 @@ import ru.yandex.practicum.ewm.request.model.Request;
 import ru.yandex.practicum.ewm.request.model.RequestStatus;
 import ru.yandex.practicum.ewm.user.dto.UserRequestDto;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -41,8 +44,9 @@ public class EventServiceImpl implements EventService {
     private final RequestClient requestClient;
     private final UserClient userClient;
     private final EventMapper mapper;
+    private final CollectorClient grpcUserActionClient;
+    private final RecommendationClient grpcEventSimilarityClient;
 
-    RestStatClient statClient;
 
     @Override
     public List<EventFullDto> getAdmin(AdminEventParams params) {
@@ -74,8 +78,8 @@ public class EventServiceImpl implements EventService {
         if (params.getSort() != null) {
             if (params.getSort().equals(EventPublicSort.EVENT_DATE)) {
                 pageRequest = PageRequest.of(params.getFrom() > 0 ? params.getFrom() / params.getSize() : 0, params.getSize(), Sort.by("eventDate"));
-            } else if (params.getSort().equals(EventPublicSort.VIEWS)) {
-                pageRequest = PageRequest.of(params.getFrom() > 0 ? params.getFrom() / params.getSize() : 0, params.getSize(), Sort.by("views"));
+            } else if (params.getSort().equals(EventPublicSort.RATING)) {
+                pageRequest = PageRequest.of(params.getFrom() > 0 ? params.getFrom() / params.getSize() : 0, params.getSize(), Sort.by("rating"));
             } else {
                 pageRequest = PageRequest.of(params.getFrom() > 0 ? params.getFrom() / params.getSize() : 0, params.getSize());
             }
@@ -95,7 +99,6 @@ public class EventServiceImpl implements EventService {
         if (foundEvents.isEmpty()) {
             throw new EventsGetPublicBadRequestException();
         }
-        statClient.saveHit(new HitDto("ewm-main-service", "/events", params.getIpAdr(), LocalDateTime.now()));
 
         List<Long> userIds = foundEvents.stream().map(Event::getInitiatorId).toList();
         Map<Long, UserRequestDto> users = userClient.getUsersById(userIds)
@@ -130,24 +133,28 @@ public class EventServiceImpl implements EventService {
     }
 
     @Override
-    public EventFullDto getByIdPublic(Long eventId, PublicEventParams params) {
+    @Transactional
+    public EventFullDto getByIdPublic(Long userId, Long eventId, PublicEventParams params) {
         Optional<Event> event = eventRepository.findById(eventId);
         if (event.isEmpty() || !event.get().getState().equals(EventState.PUBLISHED)) {
             throw new EventNotFoundException(eventId);
         }
-
-        List<StatsDto> stats = statClient.getStats("1900-01-01 00:00:00", "2100-01-01 00:00:00", List.of("/events/" + eventId), true);
-        if (stats.isEmpty()) {
-            event.get().setViews(event.get().getViews() + 1);
-            eventRepository.save(event.get());
-        }
-        statClient.saveHit(new HitDto("ewm-main-service", "/events/" + eventId, params.getIpAdr(), LocalDateTime.now()));
-
-        Long userId = event.get().getInitiatorId();
         UserRequestDto user = userClient.getUsersById(List.of(userId)).getFirst();
         if (user == null) {
             throw new UserNotFoundException(userId);
         }
+
+        Instant myInstant = Instant.now();
+        grpcUserActionClient.sendUserActionToCollector(UserActionProto.newBuilder()
+                .setUserId(userId.intValue())
+                .setEventId(eventId.intValue())
+                .setActionTypeValue(0)
+                .setTimestamp(com.google.protobuf.Timestamp.newBuilder()
+                        .setSeconds(myInstant.getEpochSecond())
+                        .setNanos(myInstant.getNano())
+                        .build())
+                .build()
+        );
 
         return mapper.toEventFullDto(event.get(), user);
     }
@@ -353,6 +360,71 @@ public class EventServiceImpl implements EventService {
         results.setConfirmedRequests(confirmedRequests);
         results.setRejectedRequests(rejectedRequests);
         return results;
+    }
+
+    @Override
+    public EventFullDto setLike(Long eventId, Long userId) {
+        UserRequestDto user = userClient.getUsersById(List.of(userId)).getFirst();
+        if (user == null) {
+            throw new UserNotFoundException(userId);
+        }
+        Optional<Event> event = eventRepository.findById(eventId);
+        if (event.isEmpty()) {
+            throw new EventNotFoundException(eventId);
+        }
+        Instant myInstant = Instant.now();
+
+        grpcUserActionClient.sendUserActionToCollector(UserActionProto.newBuilder()
+                .setUserId(userId.intValue())
+                .setEventId(eventId.intValue())
+                .setActionTypeValue(2)
+                .setTimestamp(com.google.protobuf.Timestamp.newBuilder()
+                        .setSeconds(myInstant.getEpochSecond())
+                        .setNanos(myInstant.getNano())
+                        .build())
+                .build()
+        );
+        return mapper.toEventFullDto(event.get(), user);
+    }
+
+    @Override
+    public List<EventFullDto> getRecommendations(Long userId, int maxResults) {
+        UserRequestDto user = userClient.getUsersById(List.of(userId)).getFirst();
+        if (user == null) {
+            throw new UserNotFoundException(userId);
+        }
+        List<RecommendedEventProto> recommendedEventProtoList = grpcEventSimilarityClient.getRecommendationsForUser(userId, maxResults).toList();
+        Set<Long> events = recommendedEventProtoList.stream()
+                .map(RecommendedEventProto::getEventId)
+                .collect(Collectors.toSet());
+
+        return eventRepository.findByIdIn(events).stream()
+                .map(event -> mapper.toEventFullDto(event, user))
+                .toList();
+
+    }
+
+    @Override
+    public List<RecommendedEventProto> getInteractions(Set<Long> eventsIds) {
+        List<Long> events = new ArrayList<>(eventsIds);
+        List<RecommendedEventProto> interactionsEventProtoList = grpcEventSimilarityClient.getInteractionsCount(events).toList();
+        return interactionsEventProtoList;
+    }
+
+    @Override
+    public List<EventFullDto> getSimilarEvents(Long eventId, Long userId, int maxResults) {
+        UserRequestDto user = userClient.getUsersById(List.of(userId)).getFirst();
+        if (user == null) {
+            throw new UserNotFoundException(userId);
+        }
+        List<RecommendedEventProto> similarEventsProtoList = grpcEventSimilarityClient.getSimilarEvents(eventId, userId, maxResults).toList();
+        Set<Long> events = similarEventsProtoList.stream()
+                .map(RecommendedEventProto::getEventId)
+                .collect(Collectors.toSet());
+
+        return eventRepository.findByIdIn(events).stream()
+                .map(event -> mapper.toEventFullDto(event, user))
+                .toList();
     }
 
     private BooleanExpression byStates(Set<EventState> states) {

@@ -15,7 +15,7 @@
 		<module>stats</module>
         <module>infra</module>
 		<module>core</module>
-	</modules>
+    </modules>
 	
 	<groupId>ru.practicum</groupId>
 	<artifactId>explore-with-me</artifactId>
@@ -54,6 +54,42 @@
 				<type>pom</type>
 				<scope>import</scope>
 			</dependency>
+
+			<dependency>
+				<groupId>org.apache.avro</groupId>
+				<artifactId>avro</artifactId>
+				<version>1.11.3</version>
+			</dependency>
+
+			<dependency>
+				<groupId>org.apache.kafka</groupId>
+				<artifactId>kafka-clients</artifactId>
+				<version>3.6.1</version>
+			</dependency>
+
+			<dependency>
+				<groupId>net.devh</groupId>
+				<artifactId>grpc-spring-boot-starter</artifactId>
+				<version>3.1.0.RELEASE</version>
+			</dependency>
+
+			<dependency>
+				<groupId>net.devh</groupId>
+				<artifactId>grpc-server-spring-boot-starter</artifactId>
+				<version>3.1.0.RELEASE</version>
+			</dependency>
+
+			<dependency>
+				<groupId>io.grpc</groupId>
+				<artifactId>grpc-stub</artifactId>
+				<version>1.63.0</version>
+			</dependency>
+
+			<dependency>
+				<groupId>io.grpc</groupId>
+				<artifactId>grpc-protobuf</artifactId>
+				<version>1.63.0</version>
+			</dependency>
 		</dependencies>
 	</dependencyManagement>
 
@@ -64,6 +100,25 @@
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-compiler-plugin</artifactId>
 					<version>3.11.0</version>
+				</plugin>
+
+				<plugin>
+					<groupId>org.apache.avro</groupId>
+					<artifactId>avro-maven-plugin</artifactId>
+					<version>1.11.3</version>
+					<executions>
+						<execution>
+							<phase>generate-sources</phase>
+							<goals>
+								<goal>schema</goal>
+								<goal>idl-protocol</goal>
+							</goals>
+							<configuration>
+								<sourceDirectory>${project.basedir}/src/main/avro/stats</sourceDirectory>
+								<outputDirectory>${project.build.directory}/generated-sources</outputDirectory>
+							</configuration>
+						</execution>
+					</executions>
 				</plugin>
 
 				<plugin>

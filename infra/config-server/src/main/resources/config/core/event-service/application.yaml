@@ -27,3 +27,16 @@ feign:
       default:
         connectTimeout: 160000000
         readTimeout: 160000000
+
+grpc:
+  client:
+    collector: # <- должно соответствовать значению в @GrpcClient
+      address: 'discovery:///collector'
+      enableKeepAlive: true
+      keepAliveWithoutCalls: true
+      negotiationType: plaintext
+    analyzer: # <- должно соответствовать значению в @GrpcClient
+      address: 'discovery:///analyzer'
+      enableKeepAlive: true
+      keepAliveWithoutCalls: true
+      negotiationType: plaintext

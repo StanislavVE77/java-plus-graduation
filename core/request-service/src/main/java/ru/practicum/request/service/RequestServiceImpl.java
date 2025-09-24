@@ -1,7 +1,11 @@
 package ru.practicum.request.service;
 
+import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
+import org.springframework.context.annotation.ComponentScan;
 import org.springframework.stereotype.Service;
+import ru.practicum.client.CollectorClient;
+import ru.practicum.grpc.stats.useraction.UserActionProto;
 import ru.practicum.request.client.UserClient;
 import ru.practicum.request.client.EventClient;
 import ru.practicum.request.dto.EventFullDto;
@@ -17,6 +21,7 @@ import ru.practicum.request.model.RequestStatus;
 import ru.practicum.request.storage.RequestRepository;
 import ru.practicum.request.dto.UserRequestDto;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
@@ -24,13 +29,16 @@ import java.util.stream.Collectors;
 
 @Service
 @AllArgsConstructor
+@ComponentScan(value = {"ru.yandex.practicum.ewm", "ru.practicum.client"})
 public class RequestServiceImpl implements RequestService {
 
     private final RequestRepository requestRepository;
     private final UserClient userClient;
     private final EventClient eventClient;
+    private final CollectorClient grpcProducer;
 
     @Override
+    @Transactional
     public RequestDto create(Long userId, Long eventId) {
         UserRequestDto user = userClient.getUsersById(List.of(userId)).getFirst();
         if (user == null) {
@@ -38,7 +46,7 @@ public class RequestServiceImpl implements RequestService {
         }
         EventFullDto event;
         try {
-            event = eventClient.getById(eventId);
+            event = eventClient.getById(userId, eventId);
         } catch (Exception e) {
             throw new ConflictException("You cannot register in an unpublished event.");
         }
@@ -77,6 +85,17 @@ public class RequestServiceImpl implements RequestService {
             request.setStatus(RequestStatus.CONFIRMED);
         }
 
+        Instant myInstant = Instant.now();
+        grpcProducer.sendUserActionToCollector(UserActionProto.newBuilder()
+                .setUserId(userId.intValue())
+                .setEventId(eventId.intValue())
+                .setActionTypeValue(1)
+                .setTimestamp(com.google.protobuf.Timestamp.newBuilder()
+                        .setSeconds(myInstant.getEpochSecond())
+                        .setNanos(myInstant.getNano())
+                        .build())
+                .build()
+        );
 
         return RequestMapper.toDto(requestRepository.save(request));
     }

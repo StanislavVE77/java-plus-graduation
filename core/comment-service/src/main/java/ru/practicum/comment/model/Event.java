@@ -42,5 +42,5 @@ public class Event {
 
     private String title;
 
-    private Integer views;
+    private Double rating;
 }
