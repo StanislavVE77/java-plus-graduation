@@ -26,5 +26,5 @@ public class Event {
     private Boolean requestModeration = true;
     private EventState state;
     private String title;
-    private Integer views;
+    private Double rating;
 }

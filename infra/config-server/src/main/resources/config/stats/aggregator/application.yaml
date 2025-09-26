@@ -1,0 +1,26 @@
+aggregator:
+  kafka:
+    bootstrap-servers: "localhost:9092"
+    producer:
+      properties:
+        "bootstrap.servers": ${aggregator.kafka.bootstrap-servers}
+        "key.serializer": "org.apache.kafka.common.serialization.StringSerializer"
+        "value.serializer": "ru.practicum.stats.aggregator.configuration.EventSimilarityAvroSerializer"
+      topic: "stats.events-similarity.v1"
+
+    consumer:
+      properties:
+        "bootstrap.servers": ${aggregator.kafka.bootstrap-servers}
+        "enable.auto.commit": false
+        "group.id": "stats.aggregator.useractions"
+        "key.deserializer": "org.apache.kafka.common.serialization.StringDeserializer"
+        "value.deserializer": "ru.practicum.stats.aggregator.configuration.UserActionDeserializer"
+      topic: "stats.user-actions.v1"
+      poll-timeout: 100ms
+
+grpc:
+  server:
+    port: 0
+
+server:
+  port: 0

@@ -1,8 +1,6 @@
 package ru.practicum.comment.controller;
 
-import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
-import lombok.experimental.FieldDefaults;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -22,10 +20,9 @@ import java.util.List;
 @RestController
 @RequestMapping("/admin/comments")
 @RequiredArgsConstructor
-@FieldDefaults(level = AccessLevel.PRIVATE)
 public class CommentControllerAdmin {
 
-    final CommentService commentService;
+    private final CommentService commentService;
 
     @GetMapping
     public List<CommentDtoResponse> findCommentsAdmin(@RequestParam(required = false) List<Integer> users,

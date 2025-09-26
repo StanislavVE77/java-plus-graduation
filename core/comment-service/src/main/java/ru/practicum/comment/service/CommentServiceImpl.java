@@ -1,8 +1,6 @@
 package ru.practicum.comment.service;
 
-import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
-import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Page;
@@ -29,13 +27,12 @@ import java.util.Objects;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@FieldDefaults(level = AccessLevel.PRIVATE)
 public class CommentServiceImpl implements CommentService {
 
-    final CommentRepository commentRepository;
+    private final CommentRepository commentRepository;
     private final EventClient eventClient;
     private final UserClient userClient;
-    final CommentMapper commentMapper;
+    private final CommentMapper commentMapper;
 
     @Override
     public CommentDtoResponse create(Long userId, Long eventId, CommentDtoRequest dto) {

@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package stats.message.recommendations;
+
+option java_multiple_files = true;
+option java_package = "ru.practicum.grpc.stats.recommendations";
+
+message SimilarEventsRequestProto {
+  int64 event_id = 1;
+  int64 user_id = 2;
+  int64 max_results = 3;
+}

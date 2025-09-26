@@ -57,14 +57,14 @@ public class EventPublicController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<EventFullDto> getById(
+    public ResponseEntity<EventFullDto> getById(@RequestHeader("X-EWM-USER-ID") long userId,
             @PathVariable("id") Long eventId,
             HttpServletRequest request
     ) {
         PublicEventParams publicEventParams = new PublicEventParams();
         publicEventParams.setIpAdr(request.getRemoteAddr());
-        log.info("--> GET запрос /events/{}", eventId);
-        EventFullDto event = eventService.getByIdPublic(eventId, publicEventParams);
+        log.info("--> GET запрос /events/{} для пользователя {}", eventId, userId);
+        EventFullDto event = eventService.getByIdPublic(userId, eventId, publicEventParams);
         log.info("<-- GET запрос /events/{} вернул ответ: {}", eventId, event);
         return ResponseEntity
                 .ok()
